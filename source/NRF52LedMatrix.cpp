@@ -31,6 +31,7 @@ DEALINGS IN THE SOFTWARE.
 #include "NRF52Pin.h"
 #include "CodalDmesg.h"
 #include "ErrorNo.h"
+#include <MicroBitEvent.h>
 
 using namespace codal;
 
@@ -211,6 +212,38 @@ void NRF52LEDMatrix::disable()
     enabled = false;
 }
 
+enum {
+    LIGHT_STATE_DARK = 0,
+    LIGHT_STATE_LIGHT = 1,
+    LIGHT_STATE_UNKNOWN
+};
+
+/**
+ * Check whether the light is at the on state or off.
+ * If the state has changed, emit an event.
+ */
+void
+NRF52LEDMatrix::determineLightState(void)
+{
+    const int light_threshold = 100; // TODO: expose this ?
+    static int previousLightState = LIGHT_STATE_UNKNOWN;
+
+    // If the light level is invalid, just say there is no light
+    // Might want to change the return value of `readLightLevel()` to uint8_t ?
+    const bool thereIsLight = (lightLevel > 255 || lightLevel < light_threshold) ?
+                               false : true;
+    const int currentLightState = thereIsLight ? LIGHT_STATE_LIGHT : LIGHT_STATE_DARK;
+    if (currentLightState == previousLightState)
+    {
+        return;
+    }
+
+    const uint16_t event = currentLightState == LIGHT_STATE_LIGHT ?
+                           DISPLAY_EVT_LIGHT_SENSE_LIGHT : DISPLAY_EVT_LIGHT_SENSE_DARK;
+    Event(id, event);
+    previousLightState = currentLightState;
+}
+
 /**
  * Configure the next frame to be drawn.
  */
@@ -230,6 +263,9 @@ void NRF52LEDMatrix::render()
         // We just completed a light sense strobe. Record the light level sensed.
         lightLevel = 255 - ((255 * timer.timer->CC[1]) / (timerPeriod * NRF52_LED_MATRIX_LIGHTSENSE_STROBES));
         status |= NRF52_LEDMATRIX_STATUS_LIGHTREADY;
+
+        // Determine light state and emit an event if state has changed.
+        this->determineLightState();
 
         // Restore the hardware configuration into LED drive mode.
         status |= NRF52_LEDMATRIX_STATUS_RESET;

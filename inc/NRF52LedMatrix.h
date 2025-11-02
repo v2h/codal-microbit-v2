@@ -42,6 +42,11 @@ DEALINGS IN THE SOFTWARE.
 #define NRF52_LEDMATRIX_STATUS_RESET            0x01
 #define NRF52_LEDMATRIX_STATUS_LIGHTREADY       0x02
 
+// TODO: move those to somewhere else
+// Maybe in codal-core
+#define DISPLAY_EVT_LIGHT_SENSE_DARK 0
+#define DISPLAY_EVT_LIGHT_SENSE_LIGHT 1
+
 namespace codal
 {
     /**
@@ -162,6 +167,12 @@ namespace codal
          * @return The light level sensed, as an unsigned 8-bit value in the range 0..255
          */
         int readLightLevel();
+
+        /**
+         * Check whether the light is at the on state or off.
+         * If the state has changed, emit an event.
+         */
+        void determineLightState(void);
 
         /**
          * Puts the component in (or out of) sleep (low power) mode.
